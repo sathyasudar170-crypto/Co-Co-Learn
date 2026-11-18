@@ -16,7 +16,85 @@ Try running the following commands:
 - Find [dbt events](https://events.getdbt.com) near you
 - Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
 *
-¸İô× ec232c16d7110bbfc31ac4e65f972f41
+Şğô× cf3bc63e1153390947590443cf0dfbdf
+Ğ	
+'models/marts/dimensions/ss_dim_date.sqlø{{ config(materialized='view', schema='PRACTICE') }}
+
+with all_dates as (
+
+    select appointment_date as dt from {{ ref('ss_stg_appointments') }} where appointment_date is not null
+    union
+    select bill_date as dt from {{ ref('ss_stg_billing') }} where bill_date is not null
+    union
+    select treatment_date as dt from {{ ref('ss_stg_treatments') }} where treatment_date is not null
+    union
+    select date_of_birth as dt from {{ ref('ss_stg_patients') }} where date_of_birth is not null
+    union
+    select registration_date as dt from {{ ref('ss_stg_patients') }} where registration_date is not null
+
+)
+
+select
+    to_number(to_char(dt, 'YYYYMMDD'))  as date_key,
+    dt                                  as full_date,
+    year(dt)                            as year,
+    quarter(dt)                         as quarter,
+    month(dt)                           as month_number,
+    monthname(dt)                       as month_name,
+    day(dt)                             as day_number,
+    dayname(dt)                         as day_name,
+    case when dayofweek(dt) in (0, 6) then true else false end as is_weekend
+from all_dates
+*
+şñô× 3779aaf144894350db4045371f0d0410
+è
+*models/marts/dimensions/ss_dim_doctors.sql{{ config(materialized='view', schema='PRACTICE') }}
+
+select
+    md5(doctor_id)      as doctor_sk,
+    doctor_id,
+    first_name,
+    last_name,
+    specialization,
+    phone_number,
+    years_experience,
+    hospital_branch,
+    email
+from {{ ref('ss_stg_doctors') }}
+*
+şñô× 1ed3d207c06fd56a2b8723fd4ea6a6e5
+‰
++models/marts/dimensions/ss_dim_patients.sql­{{ config(materialized='view', schema='PRACTICE') }}
+
+select
+    md5(patient_id)     as patient_sk,
+    patient_id,
+    first_name,
+    last_name,
+    gender,
+    date_of_birth,
+    contact_number,
+    address,
+    insurance_provider,
+    insurance_number,
+    email
+from {{ ref('ss_stg_patients') }}
+*
+şñô× 8b0e65be079c0df0b1103c0b8c7953f7
+Ğ
+-models/marts/dimensions/ss_dim_treatments.sqlò{{ config(materialized='view', schema='PRACTICE') }}
+
+select
+    md5(treatment_id)   as treatment_sk,
+    treatment_id,
+    appointment_id,
+    treatment_type,
+    description,
+    cost,
+    treatment_date
+from {{ ref('ss_stg_treatments') }}
+*
+şñô× 2e654c7761ecc56eb42a9679983c7298
 ¾
 macros/generate_schema_name.sqlî
 {% macro generate_schema_name(custom_schema_name, node) -%}
@@ -29,13 +107,250 @@ Try running the following commands:
 
 {%- endmacro %}
 *
-¸İô× ab10ab543885ac068b52221feef7c88b
-`
-2models/intermidiate/ss_int_appointment_details.sql*
-¸İô× f08efad5ed45eaaf8ce1bb8ad56dfcdc
-\
-.models/intermidiate/ss_int_billing_details.sql*
-¸İô× 010ae461a65be4fd6bae26839906765a
+Şğô× aab72ad9cd4df8e6e658d9a7f07948db
+È
+2models/intermidiate/ss_int_appointment_details.sqlå{{ config(materialized='view', schema='PRACTICE') }}
+
+with appointments as (
+
+    select
+        appointment_id,
+        patient_id,
+        doctor_id,
+        appointment_date,
+        appointment_time,
+        reason_for_visit,
+        status
+    from {{ ref('ss_stg_appointments') }}
+
+),
+
+patients as (
+
+    select
+        patient_id,
+        first_name  as patient_first_name,
+        last_name   as patient_last_name,
+        gender,
+        date_of_birth,
+        contact_number,
+        address,
+        insurance_provider,
+        insurance_number,
+        email       as patient_email
+    from {{ ref('ss_stg_patients') }}
+
+),
+
+doctors as (
+
+    select
+        doctor_id,
+        first_name      as doctor_first_name,
+        last_name       as doctor_last_name,
+        specialization,
+        phone_number    as doctor_phone_number,
+        years_experience,
+        hospital_branch,
+        email           as doctor_email
+    from {{ ref('ss_stg_doctors') }}
+
+),
+
+treatments_agg as (
+
+    select
+        appointment_id,
+        count(*)                as treatment_count,
+        sum(cost)               as total_treatment_cost,
+        min(treatment_date)     as earliest_treatment_date,
+        max(treatment_date)     as latest_treatment_date
+    from {{ ref('ss_stg_treatments') }}
+    group by appointment_id
+
+)
+
+select
+    -- appointment
+    a.appointment_id,
+    a.appointment_date,
+    a.appointment_time,
+    a.reason_for_visit,
+    a.status,
+
+    -- patient
+    a.patient_id,
+    p.patient_first_name,
+    p.patient_last_name,
+    p.gender,
+    p.date_of_birth,
+    p.contact_number,
+    p.address,
+    p.insurance_provider,
+    p.insurance_number,
+    p.patient_email,
+
+    -- doctor
+    a.doctor_id,
+    d.doctor_first_name,
+    d.doctor_last_name,
+    d.specialization,
+    d.doctor_phone_number,
+    d.years_experience,
+    d.hospital_branch,
+    d.doctor_email,
+
+    -- treatments (aggregated)
+    coalesce(t.treatment_count, 0)  as treatment_count,
+    t.total_treatment_cost,
+    t.earliest_treatment_date,
+    t.latest_treatment_date
+
+from appointments as a
+left join patients as p
+    on a.patient_id = p.patient_id
+left join doctors as d
+    on a.doctor_id = d.doctor_id
+left join treatments_agg as t
+    on a.appointment_id = t.appointment_id
+*
+Şğô× 0e5cb0a218f93ade1e577a7525d6054f
+î
+.models/intermidiate/ss_int_billing_details.sql{{ config(materialized='view', schema='PRACTICE') }}
+
+with billing as (
+
+    select
+        bill_id,
+        patient_id,
+        treatment_id,
+        bill_date,
+        amount,
+        payment_method,
+        payment_status
+    from {{ ref('ss_stg_billing') }}
+
+),
+
+patients as (
+
+    select
+        patient_id,
+        first_name  as patient_first_name,
+        last_name   as patient_last_name,
+        gender,
+        date_of_birth,
+        contact_number,
+        address,
+        insurance_provider,
+        insurance_number,
+        email       as patient_email
+    from {{ ref('ss_stg_patients') }}
+
+),
+
+treatments as (
+
+    select
+        treatment_id,
+        appointment_id,
+        treatment_type,
+        description     as treatment_description,
+        cost            as treatment_cost,
+        treatment_date
+    from {{ ref('ss_stg_treatments') }}
+
+),
+
+appointments as (
+
+    select
+        appointment_id,
+        doctor_id,
+        appointment_date,
+        appointment_time,
+        reason_for_visit,
+        status          as appointment_status
+    from {{ ref('ss_stg_appointments') }}
+
+),
+
+doctors as (
+
+    select
+        doctor_id,
+        first_name      as doctor_first_name,
+        last_name       as doctor_last_name,
+        specialization,
+        phone_number    as doctor_phone_number,
+        years_experience,
+        hospital_branch,
+        email           as doctor_email
+    from {{ ref('ss_stg_doctors') }}
+
+)
+
+select
+    -- billing
+    b.bill_id,
+    b.bill_date,
+    b.amount,
+    b.payment_method,
+    b.payment_status,
+
+    -- patient
+    b.patient_id,
+    p.patient_first_name,
+    p.patient_last_name,
+    p.gender,
+    p.date_of_birth,
+    p.contact_number,
+    p.address,
+    p.insurance_provider,
+    p.insurance_number,
+    p.patient_email,
+
+    -- treatment
+    b.treatment_id,
+    t.treatment_type,
+    t.treatment_description,
+    t.treatment_cost,
+    t.treatment_date,
+
+    -- appointment (via treatment)
+    t.appointment_id,
+    ap.appointment_date,
+    ap.appointment_time,
+    ap.reason_for_visit,
+    ap.appointment_status,
+
+    -- doctor (via appointment)
+    ap.doctor_id,
+    d.doctor_first_name,
+    d.doctor_last_name,
+    d.specialization,
+    d.doctor_phone_number,
+    d.years_experience,
+    d.hospital_branch,
+    d.doctor_email
+
+from billing as b
+left join patients as p
+    on b.patient_id = p.patient_id
+left join treatments as t
+    on b.treatment_id = t.treatment_id
+left join appointments as ap
+    on t.appointment_id = ap.appointment_id
+left join doctors as d
+    on ap.doctor_id = d.doctor_id
+*
+Şğô× b4a89b4c3e0cc5ca6fd461e36fe48fc6
+X
+*models/marts/facts/ss_fct_appointments.sql*
+Şğô× 4a71d28abc9b234fd84dd0ca8e61c613
+S
+%models/marts/facts/ss_fct_billing.sql*
+Şğô× 885c64ff994998f82ac10da5740e421b
 ß
 &models/staging/ss_stg_appointments.sqlˆ{{ config(
     materialized='view',
@@ -64,7 +379,7 @@ renamed as (
 )
 
 select * from renamed*
-¸İô× fea5fdac7e98b4cb3d271e0dab621908
+Şğô× 34ba3644de2c50fd18f5bb699077e772
 â
 !models/staging/ss_stg_billing.sql{{ config(
     materialized='view',
@@ -94,7 +409,7 @@ renamed as (
 
 select * from renamed
 *
-¸İô× 80ef63abb4b2f02d5059ce5766d78df9
+Şğô× d8eb8f868f521176e8cba0c46b57ea22
 §
 !models/staging/ss_stg_doctors.sqlÕ
 {{ config(
@@ -126,7 +441,7 @@ renamed as (
 
 select * from renamed
 *
-¸İô× 1843c86030ecd3c5c7644c9d98917bcd
+Şğô× 677392731413b4b349bf0c075680051e
 ş
 "models/staging/ss_stg_patients.sql«{{ config(
     materialized='view',
@@ -160,7 +475,7 @@ renamed as (
 
 select * from renamed
 *
-¸İô× 79e0d11b8dc0f2cf26dbca4a43ac637e
+Şğô× bbe3ff66a630be3e94ab88d485f1998d
 ´
 $models/staging/ss_stg_treatments.sqlß{{ config(
     materialized='view',
@@ -189,7 +504,7 @@ renamed as (
 
 select * from renamed
 *
-¸İô× a6db94f1044f64d97d77a135bee1cd81
+Şğô× fa6ff93fa68b20fe1641ec6d0a6359bb
 
 dbt_project.ymlÍ
 # Name your project! Project names should contain only lowercase characters
@@ -234,7 +549,7 @@ models:
     example:
       +materialized: view
 *
-¸İô× 042d29623153fbe67f4c04525b83bfa9
+Şğô× 3077c845d034ad3d886cdcd60a76d09f
 ê
 !models/staging/src_healthcare.yml˜
 version: 2
@@ -251,4 +566,4 @@ sources:
       - name: SOURCE_PATIENTS
       - name: SOURCE_TREATMENTS
 *
-¸İô× a098f5eec33dcf1eff288b9a6d79c3d9
+Şğô× b1993d852055200a75686abdabb8f3b2
