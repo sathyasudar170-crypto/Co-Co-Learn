@@ -1,0 +1,14 @@
+
+version: 2
+
+sources:
+  - name: healthcare_raw
+    database: COCO_PRACTICE_DB
+    schema: PRACTICE
+
+    tables:
+      - name: SOURCE_APPOINTMENTS
+      - name: SOURCE_BILLING
+      - name: SOURCE_DOCTORS
+      - name: SOURCE_PATIENTS
+      - name: SOURCE_TREATMENTS
