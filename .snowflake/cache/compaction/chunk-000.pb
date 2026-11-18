@@ -17,8 +17,94 @@ Try running the following commands:
 - Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
 *
 Şğô× cf3bc63e1153390947590443cf0dfbdf
-Ğ	
-'models/marts/dimensions/ss_dim_date.sqlø{{ config(materialized='view', schema='PRACTICE') }}
+«
+*models/marts/facts/ss_fct_appointments.sqlĞ{{ config(materialized='table', schema='PRACTICE') }}
+
+select
+    -- appointment
+    appt.appointment_id,
+    appt.appointment_date,
+    appt.appointment_time,
+    appt.status,
+
+    -- dimension surrogate keys
+    dp.patient_sk,
+    dd.doctor_sk,
+
+    -- date key
+    ddt.date_key                        as appointment_date_key,
+
+    -- business keys for traceability
+    appt.patient_id,
+    appt.doctor_id,
+
+    -- aggregated treatment measures from intermediate
+    appt.treatment_count,
+    appt.total_treatment_cost,
+    appt.earliest_treatment_date,
+    appt.latest_treatment_date,
+
+    -- fact measure
+    1                                   as appointment_count
+
+from {{ ref('ss_int_appointment_details') }} as appt
+left join {{ ref('ss_dim_patients') }} as dp
+    on appt.patient_id = dp.patient_id
+left join {{ ref('ss_dim_doctors') }} as dd
+    on appt.doctor_id = dd.doctor_id
+left join {{ ref('ss_dim_date') }} as ddt
+    on appt.appointment_date = ddt.full_date
+*
+†ùô× e25813b6f895ee84013d1aa57f03cfca
+¥	
+%models/marts/facts/ss_fct_billing.sqlÏ{{ config(materialized='table', schema='PRACTICE') }}
+
+select
+    -- billing
+    b.bill_id,
+    b.bill_date,
+    b.amount,
+    b.payment_method,
+    b.payment_status,
+
+    -- dimension surrogate keys
+    dp.patient_sk,
+    dd.doctor_sk,
+    dt.treatment_sk,
+
+    -- date keys
+    ddt_bill.date_key                   as bill_date_key,
+    ddt_treat.date_key                  as treatment_date_key,
+
+    -- business keys for traceability
+    b.patient_id,
+    b.doctor_id,
+    b.treatment_id,
+
+    -- treatment cost from intermediate
+    b.treatment_cost,
+
+    -- fact measure
+    1                                   as bill_count
+
+from {{ ref('ss_int_billing_details') }} as b
+left join {{ ref('ss_dim_patients') }} as dp
+    on b.patient_id = dp.patient_id
+left join {{ ref('ss_dim_doctors') }} as dd
+    on b.doctor_id = dd.doctor_id
+left join {{ ref('ss_dim_treatments') }} as dt
+    on b.treatment_id = dt.treatment_id
+left join {{ ref('ss_dim_date') }} as ddt_bill
+    on b.bill_date = ddt_bill.full_date
+left join {{ ref('ss_dim_date') }} as ddt_treat
+    on b.treatment_date = ddt_treat.full_date
+*
+†ùô× 30c58e95441d10170808b426a902a528
+o
+Untitled.sql3select * from coco_practice_db.practice.ss_dim_date*
+«õô× 3f1493aada762d9d4a7e30a3afad0e74
+Ñ	
+'models/marts/dimensions/ss_dim_date.sqlù{{ config(materialized='table', schema='PRACTICE') }}
 
 with all_dates as (
 
@@ -46,9 +132,23 @@ select
     case when dayofweek(dt) in (0, 6) then true else false end as is_weekend
 from all_dates
 *
-şñô× 3779aaf144894350db4045371f0d0410
-è
-*models/marts/dimensions/ss_dim_doctors.sql{{ config(materialized='view', schema='PRACTICE') }}
+šóô× 679a7da2f87f93da3d5f2258f0dac30f
+Ñ
+-models/marts/dimensions/ss_dim_treatments.sqló{{ config(materialized='table', schema='PRACTICE') }}
+
+select
+    md5(treatment_id)   as treatment_sk,
+    treatment_id,
+    appointment_id,
+    treatment_type,
+    description,
+    cost,
+    treatment_date
+from {{ ref('ss_stg_treatments') }}
+*
+”óô× e0cd7639aa15a157f8a8bde821b507d6
+é
+*models/marts/dimensions/ss_dim_doctors.sql{{ config(materialized='table', schema='PRACTICE') }}
 
 select
     md5(doctor_id)      as doctor_sk,
@@ -62,9 +162,9 @@ select
     email
 from {{ ref('ss_stg_doctors') }}
 *
-şñô× 1ed3d207c06fd56a2b8723fd4ea6a6e5
-‰
-+models/marts/dimensions/ss_dim_patients.sql­{{ config(materialized='view', schema='PRACTICE') }}
+óô× 91086876886085382bf806851c5becf3
+Š
++models/marts/dimensions/ss_dim_patients.sql®{{ config(materialized='table', schema='PRACTICE') }}
 
 select
     md5(patient_id)     as patient_sk,
@@ -80,21 +180,7 @@ select
     email
 from {{ ref('ss_stg_patients') }}
 *
-şñô× 8b0e65be079c0df0b1103c0b8c7953f7
-Ğ
--models/marts/dimensions/ss_dim_treatments.sqlò{{ config(materialized='view', schema='PRACTICE') }}
-
-select
-    md5(treatment_id)   as treatment_sk,
-    treatment_id,
-    appointment_id,
-    treatment_type,
-    description,
-    cost,
-    treatment_date
-from {{ ref('ss_stg_treatments') }}
-*
-şñô× 2e654c7761ecc56eb42a9679983c7298
+‚óô× ceb4621c39daf2cb2106b492824a13d2
 ¾
 macros/generate_schema_name.sqlî
 {% macro generate_schema_name(custom_schema_name, node) -%}
@@ -345,12 +431,6 @@ left join doctors as d
     on ap.doctor_id = d.doctor_id
 *
 Şğô× b4a89b4c3e0cc5ca6fd461e36fe48fc6
-X
-*models/marts/facts/ss_fct_appointments.sql*
-Şğô× 4a71d28abc9b234fd84dd0ca8e61c613
-S
-%models/marts/facts/ss_fct_billing.sql*
-Şğô× 885c64ff994998f82ac10da5740e421b
 ß
 &models/staging/ss_stg_appointments.sqlˆ{{ config(
     materialized='view',
