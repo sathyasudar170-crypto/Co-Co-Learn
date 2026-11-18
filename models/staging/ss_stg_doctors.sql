@@ -1,5 +1,8 @@
 
-{{ config(materialized='view') }}
+{{ config(
+    materialized='view',
+    schema='PRACTICE'
+) }}
 
 with source as (
 
