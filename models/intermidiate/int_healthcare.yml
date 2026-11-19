@@ -27,8 +27,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('ss_stg_patients')
-              field: patient_id
+              arguments:
+                to: ref('ss_stg_patients')
+                field: patient_id
       - name: patient_first_name
         description: Patient's first name, sourced from the patients staging model.
       - name: patient_last_name
@@ -52,8 +53,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('ss_stg_doctors')
-              field: doctor_id
+              arguments:
+                to: ref('ss_stg_doctors')
+                field: doctor_id
       - name: doctor_first_name
         description: Doctor's first name, sourced from the doctors staging model.
       - name: doctor_last_name
@@ -113,8 +115,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('ss_stg_patients')
-              field: patient_id
+              arguments:
+                to: ref('ss_stg_patients')
+                field: patient_id
       - name: patient_first_name
         description: Patient's first name, sourced from the patients staging model.
       - name: patient_last_name
@@ -138,8 +141,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('ss_stg_treatments')
-              field: treatment_id
+              arguments:
+                to: ref('ss_stg_treatments')
+                field: treatment_id
       - name: treatment_type
         description: Category or type of treatment administered.
       - name: treatment_description
