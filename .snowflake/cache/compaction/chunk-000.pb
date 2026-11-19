@@ -934,7 +934,330 @@ Try running the following commands:
 - Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
 *
 ﬁÙ◊ cf3bc63e1153390947590443cf0dfbdf
-¨
+Á
+.models/intermidiate/ss_int_billing_details.sqlÜ{{ config(materialized='view', schema='PRACTICE') }}
+
+-- Grain: one row per billing record, identified by bill_id.
+-- Billing joins to treatments (many-to-one via treatment_id), then to
+-- appointments (many-to-one via appointment_id), then to doctors
+-- (many-to-one via doctor_id). No fan-out risk in this chain.
+
+with billing as (
+
+    select
+        bill_id,
+        patient_id,
+        treatment_id,
+        bill_date,
+        amount,
+        payment_method,
+        payment_status
+    from {{ ref('ss_stg_billing') }}
+
+),
+
+patients as (
+
+    select
+        patient_id,
+        first_name  as patient_first_name,
+        last_name   as patient_last_name,
+        gender,
+        date_of_birth,
+        contact_number,
+        address,
+        insurance_provider,
+        insurance_number,
+        email       as patient_email
+    from {{ ref('ss_stg_patients') }}
+
+),
+
+treatments as (
+
+    select
+        treatment_id,
+        appointment_id,
+        treatment_type,
+        description     as treatment_description,
+        cost            as treatment_cost,
+        treatment_date
+    from {{ ref('ss_stg_treatments') }}
+
+),
+
+appointments as (
+
+    select
+        appointment_id,
+        doctor_id,
+        appointment_date,
+        appointment_time,
+        reason_for_visit,
+        status          as appointment_status
+    from {{ ref('ss_stg_appointments') }}
+
+),
+
+doctors as (
+
+    select
+        doctor_id,
+        first_name      as doctor_first_name,
+        last_name       as doctor_last_name,
+        specialization,
+        phone_number    as doctor_phone_number,
+        years_experience,
+        hospital_branch,
+        email           as doctor_email
+    from {{ ref('ss_stg_doctors') }}
+
+),
+
+joined as (
+
+    select
+        -- billing
+        b.bill_id,
+        b.bill_date,
+        b.amount,
+        b.payment_method,
+        b.payment_status,
+
+        -- patient
+        b.patient_id,
+        p.patient_first_name,
+        p.patient_last_name,
+        p.gender,
+        p.date_of_birth,
+        p.contact_number,
+        p.address,
+        p.insurance_provider,
+        p.insurance_number,
+        p.patient_email,
+
+        -- treatment
+        b.treatment_id,
+        t.treatment_type,
+        t.treatment_description,
+        t.treatment_cost,
+        t.treatment_date,
+
+        -- appointment (via treatment)
+        t.appointment_id,
+        ap.appointment_date,
+        ap.appointment_time,
+        ap.reason_for_visit,
+        ap.appointment_status,
+
+        -- doctor (via appointment)
+        ap.doctor_id,
+        d.doctor_first_name,
+        d.doctor_last_name,
+        d.specialization,
+        d.doctor_phone_number,
+        d.years_experience,
+        d.hospital_branch,
+        d.doctor_email
+
+    from billing as b
+    left join patients as p
+        on b.patient_id = p.patient_id
+    left join treatments as t
+        on b.treatment_id = t.treatment_id
+    left join appointments as ap
+        on t.appointment_id = ap.appointment_id
+    left join doctors as d
+        on ap.doctor_id = d.doctor_id
+
+)
+
+select
+    bill_id,
+    bill_date,
+    amount,
+    payment_method,
+    payment_status,
+    patient_id,
+    patient_first_name,
+    patient_last_name,
+    gender,
+    date_of_birth,
+    contact_number,
+    address,
+    insurance_provider,
+    insurance_number,
+    patient_email,
+    treatment_id,
+    treatment_type,
+    treatment_description,
+    treatment_cost,
+    treatment_date,
+    appointment_id,
+    appointment_date,
+    appointment_time,
+    reason_for_visit,
+    appointment_status,
+    doctor_id,
+    doctor_first_name,
+    doctor_last_name,
+    specialization,
+    doctor_phone_number,
+    years_experience,
+    hospital_branch,
+    doctor_email
+from joined
+,
+˝∏˙◊""619db252fd70583842ab5a0ba35924a4"
+ì
+2models/intermidiate/ss_int_appointment_details.sql∞{{ config(materialized='view', schema='PRACTICE') }}
+
+-- Grain: one row per appointment, identified by appointment_id.
+-- Treatments are pre-aggregated to avoid fan-out from the one-to-many
+-- relationship between appointments and treatments.
+
+with appointments as (
+
+    select
+        appointment_id,
+        patient_id,
+        doctor_id,
+        appointment_date,
+        appointment_time,
+        reason_for_visit,
+        status
+    from {{ ref('ss_stg_appointments') }}
+
+),
+
+patients as (
+
+    select
+        patient_id,
+        first_name  as patient_first_name,
+        last_name   as patient_last_name,
+        gender,
+        date_of_birth,
+        contact_number,
+        address,
+        insurance_provider,
+        insurance_number,
+        email       as patient_email
+    from {{ ref('ss_stg_patients') }}
+
+),
+
+doctors as (
+
+    select
+        doctor_id,
+        first_name      as doctor_first_name,
+        last_name       as doctor_last_name,
+        specialization,
+        phone_number    as doctor_phone_number,
+        years_experience,
+        hospital_branch,
+        email           as doctor_email
+    from {{ ref('ss_stg_doctors') }}
+
+),
+
+treatments_agg as (
+
+    select
+        appointment_id,
+        count(*)                as treatment_count,
+        sum(cost)               as total_treatment_cost,
+        min(treatment_date)     as earliest_treatment_date,
+        max(treatment_date)     as latest_treatment_date
+    from {{ ref('ss_stg_treatments') }}
+    group by appointment_id
+
+),
+
+joined as (
+
+    select
+        -- appointment
+        a.appointment_id,
+        a.appointment_date,
+        a.appointment_time,
+        a.reason_for_visit,
+        a.status,
+
+        -- patient
+        a.patient_id,
+        p.patient_first_name,
+        p.patient_last_name,
+        p.gender,
+        p.date_of_birth,
+        p.contact_number,
+        p.address,
+        p.insurance_provider,
+        p.insurance_number,
+        p.patient_email,
+
+        -- doctor
+        a.doctor_id,
+        d.doctor_first_name,
+        d.doctor_last_name,
+        d.specialization,
+        d.doctor_phone_number,
+        d.years_experience,
+        d.hospital_branch,
+        d.doctor_email,
+
+        -- treatments (aggregated to preserve appointment grain)
+        coalesce(t.treatment_count, 0)  as treatment_count,
+        t.total_treatment_cost,
+        t.earliest_treatment_date,
+        t.latest_treatment_date
+
+    from appointments as a
+    left join patients as p
+        on a.patient_id = p.patient_id
+    left join doctors as d
+        on a.doctor_id = d.doctor_id
+    left join treatments_agg as t
+        on a.appointment_id = t.appointment_id
+
+)
+
+select
+    appointment_id,
+    appointment_date,
+    appointment_time,
+    reason_for_visit,
+    status,
+    patient_id,
+    patient_first_name,
+    patient_last_name,
+    gender,
+    date_of_birth,
+    contact_number,
+    address,
+    insurance_provider,
+    insurance_number,
+    patient_email,
+    doctor_id,
+    doctor_first_name,
+    doctor_last_name,
+    specialization,
+    doctor_phone_number,
+    years_experience,
+    hospital_branch,
+    doctor_email,
+    treatment_count,
+    total_treatment_cost,
+    earliest_treatment_date,
+    latest_treatment_date
+from joined
+*
+Í∏˙◊ c699660bb53634d897de9af97dc3d6b9
+u
+Untitled.sql9select * from coco_practice_db.practice.ss_stg_treatments*
+õ∂˙◊ b8e50792b875464bf88c0becdf4d02b0
+™
 $models/staging/ss_stg_treatments.sql’{{ config(
     materialized='view',
     schema='PRACTICE'
@@ -975,8 +1298,8 @@ select
     cost,
     treatment_date
 from renamed
-,
-’≤˙◊""590a8856c97011225663d2bd246e549f"
+*
+÷≤˙◊ 590a8856c97011225663d2bd246e549f
 æ
 "models/staging/ss_stg_patients.sqlÎ
 {{ config(
@@ -1350,243 +1673,149 @@ from {{ ref('ss_stg_patients') }}
 {%- endmacro %}
 *
 ﬁÙ◊ aab72ad9cd4df8e6e658d9a7f07948db
-»
-2models/intermidiate/ss_int_appointment_details.sqlÂ{{ config(materialized='view', schema='PRACTICE') }}
+¡,
+!models/staging/stg_healthcare.ymlÔ+version: 2
 
-with appointments as (
+models:
+  - name: ss_stg_appointments
+    description: >
+      Staged appointment records from the healthcare raw source.
+      One row per appointment, identified by appointment_id.
+      Applies text trimming, empty-string-to-null conversion, and date/time casting.
+    columns:
+      - name: appointment_id
+        description: Unique identifier for each appointment.
+        tests:
+          - unique
+          - not_null
+      - name: patient_id
+        description: Foreign key referencing the patient who scheduled the appointment.
+        tests:
+          - not_null
+      - name: doctor_id
+        description: Foreign key referencing the doctor assigned to the appointment.
+        tests:
+          - not_null
+      - name: appointment_date
+        description: Calendar date of the appointment, cast to date.
+      - name: appointment_time
+        description: Scheduled time of the appointment, cast to time.
+      - name: reason_for_visit
+        description: Free-text reason the patient provided for the appointment.
+      - name: status
+        description: Current status of the appointment (e.g. scheduled, completed, cancelled).
 
-    select
-        appointment_id,
-        patient_id,
-        doctor_id,
-        appointment_date,
-        appointment_time,
-        reason_for_visit,
-        status
-    from {{ ref('ss_stg_appointments') }}
+  - name: ss_stg_billing
+    description: >
+      Staged billing records from the healthcare raw source.
+      One row per billing record, identified by bill_id.
+      Applies text trimming, empty-string-to-null conversion, date casting, and numeric casting for amounts.
+    columns:
+      - name: bill_id
+        description: Unique identifier for each billing record.
+        tests:
+          - unique
+          - not_null
+      - name: patient_id
+        description: Foreign key referencing the billed patient.
+        tests:
+          - not_null
+      - name: treatment_id
+        description: Foreign key referencing the treatment associated with this bill.
+        tests:
+          - not_null
+      - name: bill_date
+        description: Date the bill was issued, cast to date.
+      - name: amount
+        description: Billed amount, cast to number(12,2).
+      - name: payment_method
+        description: Method of payment used (e.g. insurance, credit card, cash).
+      - name: payment_status
+        description: Current payment status of the bill (e.g. paid, pending, overdue).
 
-),
+  - name: ss_stg_doctors
+    description: >
+      Staged doctor records from the healthcare raw source.
+      One row per doctor, identified by doctor_id.
+      Applies text trimming, empty-string-to-null conversion, phone formatting, integer casting for experience, and email lowercasing.
+    columns:
+      - name: doctor_id
+        description: Unique identifier for each doctor.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Doctor's first name.
+      - name: last_name
+        description: Doctor's last name.
+      - name: specialization
+        description: Medical specialization of the doctor.
+      - name: phone_number
+        description: Doctor's contact phone number, converted to varchar and trimmed.
+      - name: years_experience
+        description: Number of years of professional experience, cast to integer.
+      - name: hospital_branch
+        description: Hospital branch where the doctor primarily practices.
+      - name: email
+        description: Doctor's email address, lowercased for consistency.
 
-patients as (
+  - name: ss_stg_patients
+    description: >
+      Staged patient records from the healthcare raw source.
+      One row per patient, identified by patient_id.
+      Applies text trimming, empty-string-to-null conversion, date casting, phone formatting, and email lowercasing.
+    columns:
+      - name: patient_id
+        description: Unique identifier for each patient.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Patient's first name.
+      - name: last_name
+        description: Patient's last name.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth, cast to date.
+      - name: contact_number
+        description: Patient's contact phone number, converted to varchar and trimmed.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: registration_date
+        description: Date the patient was registered in the system, cast to date.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: email
+        description: Patient's email address, lowercased for consistency.
 
-    select
-        patient_id,
-        first_name  as patient_first_name,
-        last_name   as patient_last_name,
-        gender,
-        date_of_birth,
-        contact_number,
-        address,
-        insurance_provider,
-        insurance_number,
-        email       as patient_email
-    from {{ ref('ss_stg_patients') }}
-
-),
-
-doctors as (
-
-    select
-        doctor_id,
-        first_name      as doctor_first_name,
-        last_name       as doctor_last_name,
-        specialization,
-        phone_number    as doctor_phone_number,
-        years_experience,
-        hospital_branch,
-        email           as doctor_email
-    from {{ ref('ss_stg_doctors') }}
-
-),
-
-treatments_agg as (
-
-    select
-        appointment_id,
-        count(*)                as treatment_count,
-        sum(cost)               as total_treatment_cost,
-        min(treatment_date)     as earliest_treatment_date,
-        max(treatment_date)     as latest_treatment_date
-    from {{ ref('ss_stg_treatments') }}
-    group by appointment_id
-
-)
-
-select
-    -- appointment
-    a.appointment_id,
-    a.appointment_date,
-    a.appointment_time,
-    a.reason_for_visit,
-    a.status,
-
-    -- patient
-    a.patient_id,
-    p.patient_first_name,
-    p.patient_last_name,
-    p.gender,
-    p.date_of_birth,
-    p.contact_number,
-    p.address,
-    p.insurance_provider,
-    p.insurance_number,
-    p.patient_email,
-
-    -- doctor
-    a.doctor_id,
-    d.doctor_first_name,
-    d.doctor_last_name,
-    d.specialization,
-    d.doctor_phone_number,
-    d.years_experience,
-    d.hospital_branch,
-    d.doctor_email,
-
-    -- treatments (aggregated)
-    coalesce(t.treatment_count, 0)  as treatment_count,
-    t.total_treatment_cost,
-    t.earliest_treatment_date,
-    t.latest_treatment_date
-
-from appointments as a
-left join patients as p
-    on a.patient_id = p.patient_id
-left join doctors as d
-    on a.doctor_id = d.doctor_id
-left join treatments_agg as t
-    on a.appointment_id = t.appointment_id
+  - name: ss_stg_treatments
+    description: >
+      Staged treatment records from the healthcare raw source.
+      One row per treatment, identified by treatment_id.
+      Applies text trimming, empty-string-to-null conversion, date casting, and numeric casting for cost.
+    columns:
+      - name: treatment_id
+        description: Unique identifier for each treatment.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_id
+        description: Foreign key referencing the appointment during which this treatment was performed.
+        tests:
+          - not_null
+      - name: treatment_type
+        description: Category or type of treatment administered.
+      - name: description
+        description: Free-text description of the treatment performed.
+      - name: cost
+        description: Cost of the treatment, cast to number(12,2).
+      - name: treatment_date
+        description: Date the treatment was performed, cast to date.
 *
-ﬁÙ◊ 0e5cb0a218f93ade1e577a7525d6054f
-Ó
-.models/intermidiate/ss_int_billing_details.sqlè{{ config(materialized='view', schema='PRACTICE') }}
-
-with billing as (
-
-    select
-        bill_id,
-        patient_id,
-        treatment_id,
-        bill_date,
-        amount,
-        payment_method,
-        payment_status
-    from {{ ref('ss_stg_billing') }}
-
-),
-
-patients as (
-
-    select
-        patient_id,
-        first_name  as patient_first_name,
-        last_name   as patient_last_name,
-        gender,
-        date_of_birth,
-        contact_number,
-        address,
-        insurance_provider,
-        insurance_number,
-        email       as patient_email
-    from {{ ref('ss_stg_patients') }}
-
-),
-
-treatments as (
-
-    select
-        treatment_id,
-        appointment_id,
-        treatment_type,
-        description     as treatment_description,
-        cost            as treatment_cost,
-        treatment_date
-    from {{ ref('ss_stg_treatments') }}
-
-),
-
-appointments as (
-
-    select
-        appointment_id,
-        doctor_id,
-        appointment_date,
-        appointment_time,
-        reason_for_visit,
-        status          as appointment_status
-    from {{ ref('ss_stg_appointments') }}
-
-),
-
-doctors as (
-
-    select
-        doctor_id,
-        first_name      as doctor_first_name,
-        last_name       as doctor_last_name,
-        specialization,
-        phone_number    as doctor_phone_number,
-        years_experience,
-        hospital_branch,
-        email           as doctor_email
-    from {{ ref('ss_stg_doctors') }}
-
-)
-
-select
-    -- billing
-    b.bill_id,
-    b.bill_date,
-    b.amount,
-    b.payment_method,
-    b.payment_status,
-
-    -- patient
-    b.patient_id,
-    p.patient_first_name,
-    p.patient_last_name,
-    p.gender,
-    p.date_of_birth,
-    p.contact_number,
-    p.address,
-    p.insurance_provider,
-    p.insurance_number,
-    p.patient_email,
-
-    -- treatment
-    b.treatment_id,
-    t.treatment_type,
-    t.treatment_description,
-    t.treatment_cost,
-    t.treatment_date,
-
-    -- appointment (via treatment)
-    t.appointment_id,
-    ap.appointment_date,
-    ap.appointment_time,
-    ap.reason_for_visit,
-    ap.appointment_status,
-
-    -- doctor (via appointment)
-    ap.doctor_id,
-    d.doctor_first_name,
-    d.doctor_last_name,
-    d.specialization,
-    d.doctor_phone_number,
-    d.years_experience,
-    d.hospital_branch,
-    d.doctor_email
-
-from billing as b
-left join patients as p
-    on b.patient_id = p.patient_id
-left join treatments as t
-    on b.treatment_id = t.treatment_id
-left join appointments as ap
-    on t.appointment_id = ap.appointment_id
-left join doctors as d
-    on ap.doctor_id = d.doctor_id
-*
-ﬁÙ◊ b4a89b4c3e0cc5ca6fd461e36fe48fc6
+Ê≤˙◊ 462c26700a26b2c14d1d3545f33ccab9
 ç
 dbt_project.ymlÕ
 # Name your project! Project names should contain only lowercase characters

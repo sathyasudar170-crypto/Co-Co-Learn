@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "title": "Untitled",
+  "tabs": [
+    {
+      "tab_id": "tab-0",
+      "title": "",
+      "tiles": []
+    }
+  ],
+  "datasources": {},
+  "layout": {
+    "tab-0": {
+      "meta": {
+        "default": true
+      },
+      "positions": {}
+    }
+  },
+  "spec_version": 2,
+  "spec_revision": 18
+}

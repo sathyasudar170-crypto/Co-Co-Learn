@@ -1,0 +1,180 @@
+version: 2
+
+models:
+  - name: ss_int_appointment_details
+    description: >
+      Consolidated appointment-level dataset joining appointment, patient, doctor
+      and aggregated treatment information from staging models.
+      One row per appointment, identified by appointment_id.
+      Treatments are pre-aggregated per appointment to avoid fan-out from the
+      one-to-many relationship between appointments and treatments.
+    columns:
+      - name: appointment_id
+        description: Unique identifier for each appointment. Grain key for this model.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_date
+        description: Calendar date of the appointment.
+      - name: appointment_time
+        description: Scheduled time of the appointment.
+      - name: reason_for_visit
+        description: Free-text reason the patient provided for the appointment.
+      - name: status
+        description: Current status of the appointment (e.g. scheduled, completed, cancelled).
+      - name: patient_id
+        description: Foreign key referencing the patient who scheduled the appointment.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('ss_stg_patients')
+              field: patient_id
+      - name: patient_first_name
+        description: Patient's first name, sourced from the patients staging model.
+      - name: patient_last_name
+        description: Patient's last name, sourced from the patients staging model.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth.
+      - name: contact_number
+        description: Patient's contact phone number.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: patient_email
+        description: Patient's email address.
+      - name: doctor_id
+        description: Foreign key referencing the doctor assigned to the appointment.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('ss_stg_doctors')
+              field: doctor_id
+      - name: doctor_first_name
+        description: Doctor's first name, sourced from the doctors staging model.
+      - name: doctor_last_name
+        description: Doctor's last name, sourced from the doctors staging model.
+      - name: specialization
+        description: Medical specialization of the doctor.
+      - name: doctor_phone_number
+        description: Doctor's contact phone number.
+      - name: years_experience
+        description: Number of years of professional experience for the doctor.
+      - name: hospital_branch
+        description: Hospital branch where the doctor primarily practices.
+      - name: doctor_email
+        description: Doctor's email address.
+      - name: treatment_count
+        description: >
+          Number of treatments associated with this appointment.
+          Defaults to 0 when no treatments exist.
+        tests:
+          - not_null
+      - name: total_treatment_cost
+        description: >
+          Sum of treatment costs for all treatments associated with this appointment.
+          NULL when no treatments exist.
+      - name: earliest_treatment_date
+        description: >
+          Earliest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+      - name: latest_treatment_date
+        description: >
+          Latest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+
+  - name: ss_int_billing_details
+    description: >
+      Consolidated billing-level dataset joining billing, patient, treatment,
+      appointment and doctor information from staging models.
+      One row per billing record, identified by bill_id.
+      Joins traverse billing to treatment (many-to-one), treatment to appointment
+      (many-to-one), and appointment to doctor (many-to-one). No fan-out risk.
+    columns:
+      - name: bill_id
+        description: Unique identifier for each billing record. Grain key for this model.
+        tests:
+          - unique
+          - not_null
+      - name: bill_date
+        description: Date the bill was issued.
+      - name: amount
+        description: Billed amount.
+      - name: payment_method
+        description: Method of payment used (e.g. insurance, credit card, cash).
+      - name: payment_status
+        description: Current payment status of the bill (e.g. paid, pending, overdue).
+      - name: patient_id
+        description: Foreign key referencing the billed patient.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('ss_stg_patients')
+              field: patient_id
+      - name: patient_first_name
+        description: Patient's first name, sourced from the patients staging model.
+      - name: patient_last_name
+        description: Patient's last name, sourced from the patients staging model.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth.
+      - name: contact_number
+        description: Patient's contact phone number.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: patient_email
+        description: Patient's email address.
+      - name: treatment_id
+        description: Foreign key referencing the treatment associated with this bill.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('ss_stg_treatments')
+              field: treatment_id
+      - name: treatment_type
+        description: Category or type of treatment administered.
+      - name: treatment_description
+        description: Free-text description of the treatment performed.
+      - name: treatment_cost
+        description: Cost of the treatment from the treatments staging model.
+      - name: treatment_date
+        description: Date the treatment was performed.
+      - name: appointment_id
+        description: >
+          Appointment associated with this billing record, resolved via treatment.
+          May be NULL if the treatment lacks an appointment reference.
+      - name: appointment_date
+        description: Date of the associated appointment. NULL if no appointment link.
+      - name: appointment_time
+        description: Time of the associated appointment. NULL if no appointment link.
+      - name: reason_for_visit
+        description: Reason for the associated appointment visit. NULL if no appointment link.
+      - name: appointment_status
+        description: Status of the associated appointment. NULL if no appointment link.
+      - name: doctor_id
+        description: >
+          Doctor associated with this billing record, resolved via appointment.
+          May be NULL if no appointment or doctor link exists.
+      - name: doctor_first_name
+        description: Doctor's first name. NULL if no doctor link.
+      - name: doctor_last_name
+        description: Doctor's last name. NULL if no doctor link.
+      - name: specialization
+        description: Medical specialization of the doctor. NULL if no doctor link.
+      - name: doctor_phone_number
+        description: Doctor's contact phone number. NULL if no doctor link.
+      - name: years_experience
+        description: Years of experience for the doctor. NULL if no doctor link.
+      - name: hospital_branch
+        description: Hospital branch of the doctor. NULL if no doctor link.
+      - name: doctor_email
+        description: Doctor's email address. NULL if no doctor link.
