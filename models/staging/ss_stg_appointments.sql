@@ -5,7 +5,15 @@
 
 with source as (
 
-    select * from {{ source('healthcare_raw', 'SOURCE_APPOINTMENTS') }}
+    select
+        appointment_id,
+        patient_id,
+        doctor_id,
+        appointment_date,
+        appointment_time,
+        reason_for_visit,
+        status
+    from {{ source('healthcare_raw', 'SOURCE_APPOINTMENTS') }}
 
 ),
 
@@ -24,4 +32,12 @@ renamed as (
 
 )
 
-select * from renamed
+select
+    appointment_id,
+    patient_id,
+    doctor_id,
+    appointment_date,
+    appointment_time,
+    reason_for_visit,
+    status
+from renamed

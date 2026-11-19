@@ -5,7 +5,15 @@
 
 with source as (
 
-    select * from {{ source('healthcare_raw', 'SOURCE_BILLING') }}
+    select
+        bill_id,
+        patient_id,
+        treatment_id,
+        bill_date,
+        amount,
+        payment_method,
+        payment_status
+    from {{ source('healthcare_raw', 'SOURCE_BILLING') }}
 
 ),
 
@@ -24,4 +32,12 @@ renamed as (
 
 )
 
-select * from renamed
+select
+    bill_id,
+    patient_id,
+    treatment_id,
+    bill_date,
+    amount,
+    payment_method,
+    payment_status
+from renamed

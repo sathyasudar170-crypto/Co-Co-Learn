@@ -1,4 +1,3 @@
-
 {{ config(
     materialized='view',
     schema='PRACTICE'
@@ -6,7 +5,16 @@
 
 with source as (
 
-    select * from {{ source('healthcare_raw', 'SOURCE_DOCTORS') }}
+    select
+        doctor_id,
+        first_name,
+        last_name,
+        specialization,
+        phone_number,
+        years_experience,
+        hospital_branch,
+        email
+    from {{ source('healthcare_raw', 'SOURCE_DOCTORS') }}
 
 ),
 
@@ -26,4 +34,13 @@ renamed as (
 
 )
 
-select * from renamed
+select
+    doctor_id,
+    first_name,
+    last_name,
+    specialization,
+    phone_number,
+    years_experience,
+    hospital_branch,
+    email
+from renamed

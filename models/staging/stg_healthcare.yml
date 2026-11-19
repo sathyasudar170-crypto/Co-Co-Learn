@@ -1,0 +1,140 @@
+version: 2
+
+models:
+  - name: ss_stg_appointments
+    description: >
+      Staged appointment records from the healthcare raw source.
+      One row per appointment, identified by appointment_id.
+      Applies text trimming, empty-string-to-null conversion, and date/time casting.
+    columns:
+      - name: appointment_id
+        description: Unique identifier for each appointment.
+        tests:
+          - unique
+          - not_null
+      - name: patient_id
+        description: Foreign key referencing the patient who scheduled the appointment.
+        tests:
+          - not_null
+      - name: doctor_id
+        description: Foreign key referencing the doctor assigned to the appointment.
+        tests:
+          - not_null
+      - name: appointment_date
+        description: Calendar date of the appointment, cast to date.
+      - name: appointment_time
+        description: Scheduled time of the appointment, cast to time.
+      - name: reason_for_visit
+        description: Free-text reason the patient provided for the appointment.
+      - name: status
+        description: Current status of the appointment (e.g. scheduled, completed, cancelled).
+
+  - name: ss_stg_billing
+    description: >
+      Staged billing records from the healthcare raw source.
+      One row per billing record, identified by bill_id.
+      Applies text trimming, empty-string-to-null conversion, date casting, and numeric casting for amounts.
+    columns:
+      - name: bill_id
+        description: Unique identifier for each billing record.
+        tests:
+          - unique
+          - not_null
+      - name: patient_id
+        description: Foreign key referencing the billed patient.
+        tests:
+          - not_null
+      - name: treatment_id
+        description: Foreign key referencing the treatment associated with this bill.
+        tests:
+          - not_null
+      - name: bill_date
+        description: Date the bill was issued, cast to date.
+      - name: amount
+        description: Billed amount, cast to number(12,2).
+      - name: payment_method
+        description: Method of payment used (e.g. insurance, credit card, cash).
+      - name: payment_status
+        description: Current payment status of the bill (e.g. paid, pending, overdue).
+
+  - name: ss_stg_doctors
+    description: >
+      Staged doctor records from the healthcare raw source.
+      One row per doctor, identified by doctor_id.
+      Applies text trimming, empty-string-to-null conversion, phone formatting, integer casting for experience, and email lowercasing.
+    columns:
+      - name: doctor_id
+        description: Unique identifier for each doctor.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Doctor's first name.
+      - name: last_name
+        description: Doctor's last name.
+      - name: specialization
+        description: Medical specialization of the doctor.
+      - name: phone_number
+        description: Doctor's contact phone number, converted to varchar and trimmed.
+      - name: years_experience
+        description: Number of years of professional experience, cast to integer.
+      - name: hospital_branch
+        description: Hospital branch where the doctor primarily practices.
+      - name: email
+        description: Doctor's email address, lowercased for consistency.
+
+  - name: ss_stg_patients
+    description: >
+      Staged patient records from the healthcare raw source.
+      One row per patient, identified by patient_id.
+      Applies text trimming, empty-string-to-null conversion, date casting, phone formatting, and email lowercasing.
+    columns:
+      - name: patient_id
+        description: Unique identifier for each patient.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Patient's first name.
+      - name: last_name
+        description: Patient's last name.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth, cast to date.
+      - name: contact_number
+        description: Patient's contact phone number, converted to varchar and trimmed.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: registration_date
+        description: Date the patient was registered in the system, cast to date.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: email
+        description: Patient's email address, lowercased for consistency.
+
+  - name: ss_stg_treatments
+    description: >
+      Staged treatment records from the healthcare raw source.
+      One row per treatment, identified by treatment_id.
+      Applies text trimming, empty-string-to-null conversion, date casting, and numeric casting for cost.
+    columns:
+      - name: treatment_id
+        description: Unique identifier for each treatment.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_id
+        description: Foreign key referencing the appointment during which this treatment was performed.
+        tests:
+          - not_null
+      - name: treatment_type
+        description: Category or type of treatment administered.
+      - name: description
+        description: Free-text description of the treatment performed.
+      - name: cost
+        description: Cost of the treatment, cast to number(12,2).
+      - name: treatment_date
+        description: Date the treatment was performed, cast to date.

@@ -1,1 +1,0 @@
-select * from coco_practice_db.practice.ss_dim_date

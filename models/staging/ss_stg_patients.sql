@@ -5,7 +5,19 @@
 
 with source as (
 
-    select * from {{ source('healthcare_raw', 'SOURCE_PATIENTS') }}
+    select
+        patient_id,
+        first_name,
+        last_name,
+        gender,
+        date_of_birth,
+        contact_number,
+        address,
+        registration_date,
+        insurance_provider,
+        insurance_number,
+        email
+    from {{ source('healthcare_raw', 'SOURCE_PATIENTS') }}
 
 ),
 
@@ -28,4 +40,16 @@ renamed as (
 
 )
 
-select * from renamed
+select
+    patient_id,
+    first_name,
+    last_name,
+    gender,
+    date_of_birth,
+    contact_number,
+    address,
+    registration_date,
+    insurance_provider,
+    insurance_number,
+    email
+from renamed
