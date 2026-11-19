@@ -1,0 +1,140 @@
+version: 2
+
+models:
+  - name: ss_dim_patients
+    description: >
+      Patient dimension containing one row per patient, identified by patient_id.
+      Includes a surrogate key (patient_sk) generated via md5(patient_id) and all
+      patient demographic and insurance attributes from the staging layer.
+      Type 1 dimension: reflects current patient state only.
+    columns:
+      - name: patient_sk
+        description: >
+          Surrogate key for the patient dimension, generated as md5(patient_id).
+          Referenced by fact tables as a foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: patient_id
+        description: Natural business key identifying each patient from the source system.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Patient's first name.
+      - name: last_name
+        description: Patient's last name.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth.
+      - name: contact_number
+        description: Patient's contact phone number.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: email
+        description: Patient's email address, lowercased for consistency.
+
+  - name: ss_dim_doctors
+    description: >
+      Doctor dimension containing one row per doctor, identified by doctor_id.
+      Includes a surrogate key (doctor_sk) generated via md5(doctor_id) and all
+      doctor professional attributes from the staging layer.
+      Type 1 dimension: reflects current doctor state only.
+    columns:
+      - name: doctor_sk
+        description: >
+          Surrogate key for the doctor dimension, generated as md5(doctor_id).
+          Referenced by fact tables as a foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: doctor_id
+        description: Natural business key identifying each doctor from the source system.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Doctor's first name.
+      - name: last_name
+        description: Doctor's last name.
+      - name: specialization
+        description: Medical specialization of the doctor.
+      - name: phone_number
+        description: Doctor's contact phone number.
+      - name: years_experience
+        description: Number of years of professional experience.
+      - name: hospital_branch
+        description: Hospital branch where the doctor primarily practices.
+      - name: email
+        description: Doctor's email address, lowercased for consistency.
+
+  - name: ss_dim_treatments
+    description: >
+      Treatment dimension containing one row per treatment, identified by treatment_id.
+      Includes a surrogate key (treatment_sk) generated via md5(treatment_id) and all
+      treatment attributes from the staging layer.
+      Type 1 dimension: reflects current treatment state only.
+    columns:
+      - name: treatment_sk
+        description: >
+          Surrogate key for the treatment dimension, generated as md5(treatment_id).
+          Referenced by fact tables as a foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: treatment_id
+        description: Natural business key identifying each treatment from the source system.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_id
+        description: Foreign key referencing the appointment during which this treatment was performed.
+        tests:
+          - not_null
+      - name: treatment_type
+        description: Category or type of treatment administered.
+      - name: description
+        description: Free-text description of the treatment performed.
+      - name: cost
+        description: Cost of the treatment.
+      - name: treatment_date
+        description: Date the treatment was performed.
+
+  - name: ss_dim_date
+    description: >
+      Date dimension containing one row per calendar date derived from all date
+      columns across staging models (appointment_date, bill_date, treatment_date,
+      date_of_birth, registration_date). Identified by date_key (YYYYMMDD integer).
+      Provides calendar attributes for time-based analysis in fact tables.
+    columns:
+      - name: date_key
+        description: >
+          Integer surrogate key in YYYYMMDD format, derived from to_number(to_char(full_date, 'YYYYMMDD')).
+          Referenced by fact tables as a date foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: full_date
+        description: The actual calendar date value.
+        tests:
+          - unique
+          - not_null
+      - name: year
+        description: Four-digit year extracted from the date.
+      - name: quarter
+        description: Quarter of the year (1-4).
+      - name: month_number
+        description: Month number (1-12).
+      - name: month_name
+        description: Abbreviated month name (e.g. Jan, Feb).
+      - name: day_number
+        description: Day of the month (1-31).
+      - name: day_name
+        description: Abbreviated day name (e.g. Mon, Tue).
+      - name: is_weekend
+        description: Boolean flag indicating whether the date falls on a weekend (Saturday or Sunday).

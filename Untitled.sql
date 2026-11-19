@@ -1,1 +1,1 @@
-select * from coco_practice_db.practice.ss_stg_treatments
+select * from coco_practice_db.practice.ss_int_billing_details

@@ -934,7 +934,10 @@ Try running the following commands:
 - Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
 *
 Þðô× cf3bc63e1153390947590443cf0dfbdf
-ç
+z
+Untitled.sql>select * from coco_practice_db.practice.ss_int_billing_details*
+—¼ú× e92ce2ac04c8b2fbe3f5441237d0e8e8
+å
 .models/intermidiate/ss_int_billing_details.sql†{{ config(materialized='view', schema='PRACTICE') }}
 
 -- Grain: one row per billing record, identified by bill_id.
@@ -1107,8 +1110,8 @@ select
     hospital_branch,
     doctor_email
 from joined
-,
-ý¸ú×""619db252fd70583842ab5a0ba35924a4"
+*
+þ¸ú× 619db252fd70583842ab5a0ba35924a4
 “
 2models/intermidiate/ss_int_appointment_details.sql°{{ config(materialized='view', schema='PRACTICE') }}
 
@@ -1254,9 +1257,6 @@ select
 from joined
 *
 ê¸ú× c699660bb53634d897de9af97dc3d6b9
-u
-Untitled.sql9select * from coco_practice_db.practice.ss_stg_treatments*
-›¶ú× b8e50792b875464bf88c0becdf4d02b0
 ª
 $models/staging/ss_stg_treatments.sqlÕ{{ config(
     materialized='view',
@@ -1673,6 +1673,515 @@ from {{ ref('ss_stg_patients') }}
 {%- endmacro %}
 *
 Þðô× aab72ad9cd4df8e6e658d9a7f07948db
+Ë5
+%models/marts/facts/fct_healthcare.ymlõ4version: 2
+
+models:
+  - name: ss_fct_appointments
+    description: >
+      Appointment fact table containing one row per appointment, identified by appointment_id.
+      Sources from ss_int_appointment_details and joins to patient, doctor, and date
+      dimensions for surrogate and date keys. Includes aggregated treatment measures
+      (count, total cost, earliest/latest treatment date) carried forward from the
+      intermediate model. Materialized as a table.
+    columns:
+      - name: appointment_id
+        description: >
+          Natural business key identifying each appointment. Grain key for this fact.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_date
+        description: Calendar date of the appointment.
+      - name: appointment_time
+        description: Scheduled time of the appointment.
+      - name: status
+        description: Current status of the appointment (e.g. scheduled, completed, cancelled).
+      - name: patient_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_patients.
+          Resolved by joining the intermediate patient_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_patients')
+                field: patient_sk
+      - name: doctor_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_doctors.
+          Resolved by joining the intermediate doctor_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_doctors')
+                field: doctor_sk
+      - name: appointment_date_key
+        description: >
+          Integer date key (YYYYMMDD) referencing ss_dim_date for the appointment date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_date')
+                field: date_key
+      - name: patient_id
+        description: Business key for the patient, retained for traceability.
+        tests:
+          - not_null
+      - name: doctor_id
+        description: Business key for the doctor, retained for traceability.
+        tests:
+          - not_null
+      - name: treatment_count
+        description: >
+          Number of treatments associated with this appointment.
+          Defaults to 0 when no treatments exist, carried from the intermediate model.
+        tests:
+          - not_null
+      - name: total_treatment_cost
+        description: >
+          Sum of all treatment costs for this appointment.
+          NULL when no treatments exist.
+      - name: earliest_treatment_date
+        description: >
+          Earliest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+      - name: latest_treatment_date
+        description: >
+          Latest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+      - name: appointment_count
+        description: >
+          Constant measure (always 1) for counting appointments in aggregations.
+        tests:
+          - not_null
+
+  - name: ss_fct_billing
+    description: >
+      Billing fact table containing one row per billing record, identified by bill_id.
+      Sources from ss_int_billing_details and joins to patient, doctor, treatment,
+      and date dimensions for surrogate and date keys. Includes treatment cost
+      carried forward from the intermediate model. Materialized as a table.
+    columns:
+      - name: bill_id
+        description: >
+          Natural business key identifying each billing record. Grain key for this fact.
+        tests:
+          - unique
+          - not_null
+      - name: bill_date
+        description: Date the bill was issued.
+      - name: amount
+        description: Billed amount.
+      - name: payment_method
+        description: Method of payment used (e.g. insurance, credit card, cash).
+      - name: payment_status
+        description: Current payment status of the bill (e.g. paid, pending, overdue).
+      - name: patient_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_patients.
+          Resolved by joining the intermediate patient_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_patients')
+                field: patient_sk
+      - name: doctor_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_doctors.
+          Resolved by joining the intermediate doctor_id to the dimension.
+          May be NULL when the billing record's treatment lacks an appointment
+          or the appointment lacks a doctor reference.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('ss_dim_doctors')
+                field: doctor_sk
+      - name: treatment_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_treatments.
+          Resolved by joining the intermediate treatment_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_treatments')
+                field: treatment_sk
+      - name: bill_date_key
+        description: >
+          Integer date key (YYYYMMDD) referencing ss_dim_date for the bill date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_date')
+                field: date_key
+      - name: treatment_date_key
+        description: >
+          Integer date key (YYYYMMDD) referencing ss_dim_date for the treatment date.
+          May be NULL when the billing record's treatment reference does not resolve.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('ss_dim_date')
+                field: date_key
+      - name: patient_id
+        description: Business key for the patient, retained for traceability.
+        tests:
+          - not_null
+      - name: doctor_id
+        description: >
+          Business key for the doctor, retained for traceability.
+          May be NULL when the join chain (billing to treatment to appointment to doctor)
+          does not fully resolve.
+      - name: treatment_id
+        description: Business key for the treatment, retained for traceability.
+        tests:
+          - not_null
+      - name: treatment_cost
+        description: >
+          Cost of the individual treatment associated with this billing record,
+          carried from the intermediate model.
+      - name: bill_count
+        description: >
+          Constant measure (always 1) for counting billing records in aggregations.
+        tests:
+          - not_null
+*
+˜¿ú× 3380cca431858c5db71ac8fe1bd237e9
+Ä+
+*models/marts/dimensions/dim_healthcare.ymlé*version: 2
+
+models:
+  - name: ss_dim_patients
+    description: >
+      Patient dimension containing one row per patient, identified by patient_id.
+      Includes a surrogate key (patient_sk) generated via md5(patient_id) and all
+      patient demographic and insurance attributes from the staging layer.
+      Type 1 dimension: reflects current patient state only.
+    columns:
+      - name: patient_sk
+        description: >
+          Surrogate key for the patient dimension, generated as md5(patient_id).
+          Referenced by fact tables as a foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: patient_id
+        description: Natural business key identifying each patient from the source system.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Patient's first name.
+      - name: last_name
+        description: Patient's last name.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth.
+      - name: contact_number
+        description: Patient's contact phone number.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: email
+        description: Patient's email address, lowercased for consistency.
+
+  - name: ss_dim_doctors
+    description: >
+      Doctor dimension containing one row per doctor, identified by doctor_id.
+      Includes a surrogate key (doctor_sk) generated via md5(doctor_id) and all
+      doctor professional attributes from the staging layer.
+      Type 1 dimension: reflects current doctor state only.
+    columns:
+      - name: doctor_sk
+        description: >
+          Surrogate key for the doctor dimension, generated as md5(doctor_id).
+          Referenced by fact tables as a foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: doctor_id
+        description: Natural business key identifying each doctor from the source system.
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Doctor's first name.
+      - name: last_name
+        description: Doctor's last name.
+      - name: specialization
+        description: Medical specialization of the doctor.
+      - name: phone_number
+        description: Doctor's contact phone number.
+      - name: years_experience
+        description: Number of years of professional experience.
+      - name: hospital_branch
+        description: Hospital branch where the doctor primarily practices.
+      - name: email
+        description: Doctor's email address, lowercased for consistency.
+
+  - name: ss_dim_treatments
+    description: >
+      Treatment dimension containing one row per treatment, identified by treatment_id.
+      Includes a surrogate key (treatment_sk) generated via md5(treatment_id) and all
+      treatment attributes from the staging layer.
+      Type 1 dimension: reflects current treatment state only.
+    columns:
+      - name: treatment_sk
+        description: >
+          Surrogate key for the treatment dimension, generated as md5(treatment_id).
+          Referenced by fact tables as a foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: treatment_id
+        description: Natural business key identifying each treatment from the source system.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_id
+        description: Foreign key referencing the appointment during which this treatment was performed.
+        tests:
+          - not_null
+      - name: treatment_type
+        description: Category or type of treatment administered.
+      - name: description
+        description: Free-text description of the treatment performed.
+      - name: cost
+        description: Cost of the treatment.
+      - name: treatment_date
+        description: Date the treatment was performed.
+
+  - name: ss_dim_date
+    description: >
+      Date dimension containing one row per calendar date derived from all date
+      columns across staging models (appointment_date, bill_date, treatment_date,
+      date_of_birth, registration_date). Identified by date_key (YYYYMMDD integer).
+      Provides calendar attributes for time-based analysis in fact tables.
+    columns:
+      - name: date_key
+        description: >
+          Integer surrogate key in YYYYMMDD format, derived from to_number(to_char(full_date, 'YYYYMMDD')).
+          Referenced by fact tables as a date foreign key.
+        tests:
+          - unique
+          - not_null
+      - name: full_date
+        description: The actual calendar date value.
+        tests:
+          - unique
+          - not_null
+      - name: year
+        description: Four-digit year extracted from the date.
+      - name: quarter
+        description: Quarter of the year (1-4).
+      - name: month_number
+        description: Month number (1-12).
+      - name: month_name
+        description: Abbreviated month name (e.g. Jan, Feb).
+      - name: day_number
+        description: Day of the month (1-31).
+      - name: day_name
+        description: Abbreviated day name (e.g. Mon, Tue).
+      - name: is_weekend
+        description: Boolean flag indicating whether the date falls on a weekend (Saturday or Sunday).
+*
+ÿ¾ú× dcfbf208cb21ea7c594eb3a146624c5f
+Ø?
+&models/intermidiate/int_healthcare.yml?version: 2
+
+models:
+  - name: ss_int_appointment_details
+    description: >
+      Consolidated appointment-level dataset joining appointment, patient, doctor
+      and aggregated treatment information from staging models.
+      One row per appointment, identified by appointment_id.
+      Treatments are pre-aggregated per appointment to avoid fan-out from the
+      one-to-many relationship between appointments and treatments.
+    columns:
+      - name: appointment_id
+        description: Unique identifier for each appointment. Grain key for this model.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_date
+        description: Calendar date of the appointment.
+      - name: appointment_time
+        description: Scheduled time of the appointment.
+      - name: reason_for_visit
+        description: Free-text reason the patient provided for the appointment.
+      - name: status
+        description: Current status of the appointment (e.g. scheduled, completed, cancelled).
+      - name: patient_id
+        description: Foreign key referencing the patient who scheduled the appointment.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_stg_patients')
+                field: patient_id
+      - name: patient_first_name
+        description: Patient's first name, sourced from the patients staging model.
+      - name: patient_last_name
+        description: Patient's last name, sourced from the patients staging model.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth.
+      - name: contact_number
+        description: Patient's contact phone number.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: patient_email
+        description: Patient's email address.
+      - name: doctor_id
+        description: Foreign key referencing the doctor assigned to the appointment.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_stg_doctors')
+                field: doctor_id
+      - name: doctor_first_name
+        description: Doctor's first name, sourced from the doctors staging model.
+      - name: doctor_last_name
+        description: Doctor's last name, sourced from the doctors staging model.
+      - name: specialization
+        description: Medical specialization of the doctor.
+      - name: doctor_phone_number
+        description: Doctor's contact phone number.
+      - name: years_experience
+        description: Number of years of professional experience for the doctor.
+      - name: hospital_branch
+        description: Hospital branch where the doctor primarily practices.
+      - name: doctor_email
+        description: Doctor's email address.
+      - name: treatment_count
+        description: >
+          Number of treatments associated with this appointment.
+          Defaults to 0 when no treatments exist.
+        tests:
+          - not_null
+      - name: total_treatment_cost
+        description: >
+          Sum of treatment costs for all treatments associated with this appointment.
+          NULL when no treatments exist.
+      - name: earliest_treatment_date
+        description: >
+          Earliest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+      - name: latest_treatment_date
+        description: >
+          Latest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+
+  - name: ss_int_billing_details
+    description: >
+      Consolidated billing-level dataset joining billing, patient, treatment,
+      appointment and doctor information from staging models.
+      One row per billing record, identified by bill_id.
+      Joins traverse billing to treatment (many-to-one), treatment to appointment
+      (many-to-one), and appointment to doctor (many-to-one). No fan-out risk.
+    columns:
+      - name: bill_id
+        description: Unique identifier for each billing record. Grain key for this model.
+        tests:
+          - unique
+          - not_null
+      - name: bill_date
+        description: Date the bill was issued.
+      - name: amount
+        description: Billed amount.
+      - name: payment_method
+        description: Method of payment used (e.g. insurance, credit card, cash).
+      - name: payment_status
+        description: Current payment status of the bill (e.g. paid, pending, overdue).
+      - name: patient_id
+        description: Foreign key referencing the billed patient.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_stg_patients')
+                field: patient_id
+      - name: patient_first_name
+        description: Patient's first name, sourced from the patients staging model.
+      - name: patient_last_name
+        description: Patient's last name, sourced from the patients staging model.
+      - name: gender
+        description: Patient's reported gender.
+      - name: date_of_birth
+        description: Patient's date of birth.
+      - name: contact_number
+        description: Patient's contact phone number.
+      - name: address
+        description: Patient's mailing or residential address.
+      - name: insurance_provider
+        description: Name of the patient's insurance provider.
+      - name: insurance_number
+        description: Patient's insurance policy number.
+      - name: patient_email
+        description: Patient's email address.
+      - name: treatment_id
+        description: Foreign key referencing the treatment associated with this bill.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_stg_treatments')
+                field: treatment_id
+      - name: treatment_type
+        description: Category or type of treatment administered.
+      - name: treatment_description
+        description: Free-text description of the treatment performed.
+      - name: treatment_cost
+        description: Cost of the treatment from the treatments staging model.
+      - name: treatment_date
+        description: Date the treatment was performed.
+      - name: appointment_id
+        description: >
+          Appointment associated with this billing record, resolved via treatment.
+          May be NULL if the treatment lacks an appointment reference.
+      - name: appointment_date
+        description: Date of the associated appointment. NULL if no appointment link.
+      - name: appointment_time
+        description: Time of the associated appointment. NULL if no appointment link.
+      - name: reason_for_visit
+        description: Reason for the associated appointment visit. NULL if no appointment link.
+      - name: appointment_status
+        description: Status of the associated appointment. NULL if no appointment link.
+      - name: doctor_id
+        description: >
+          Doctor associated with this billing record, resolved via appointment.
+          May be NULL if no appointment or doctor link exists.
+      - name: doctor_first_name
+        description: Doctor's first name. NULL if no doctor link.
+      - name: doctor_last_name
+        description: Doctor's last name. NULL if no doctor link.
+      - name: specialization
+        description: Medical specialization of the doctor. NULL if no doctor link.
+      - name: doctor_phone_number
+        description: Doctor's contact phone number. NULL if no doctor link.
+      - name: years_experience
+        description: Years of experience for the doctor. NULL if no doctor link.
+      - name: hospital_branch
+        description: Hospital branch of the doctor. NULL if no doctor link.
+      - name: doctor_email
+        description: Doctor's email address. NULL if no doctor link.
+*
+‡»ú× 2a12e1b573dd7a1be8cfa1125a58a2ad
 Á,
 !models/staging/stg_healthcare.ymlï+version: 2
 

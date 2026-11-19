@@ -1,0 +1,176 @@
+version: 2
+
+models:
+  - name: ss_fct_appointments
+    description: >
+      Appointment fact table containing one row per appointment, identified by appointment_id.
+      Sources from ss_int_appointment_details and joins to patient, doctor, and date
+      dimensions for surrogate and date keys. Includes aggregated treatment measures
+      (count, total cost, earliest/latest treatment date) carried forward from the
+      intermediate model. Materialized as a table.
+    columns:
+      - name: appointment_id
+        description: >
+          Natural business key identifying each appointment. Grain key for this fact.
+        tests:
+          - unique
+          - not_null
+      - name: appointment_date
+        description: Calendar date of the appointment.
+      - name: appointment_time
+        description: Scheduled time of the appointment.
+      - name: status
+        description: Current status of the appointment (e.g. scheduled, completed, cancelled).
+      - name: patient_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_patients.
+          Resolved by joining the intermediate patient_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_patients')
+                field: patient_sk
+      - name: doctor_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_doctors.
+          Resolved by joining the intermediate doctor_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_doctors')
+                field: doctor_sk
+      - name: appointment_date_key
+        description: >
+          Integer date key (YYYYMMDD) referencing ss_dim_date for the appointment date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_date')
+                field: date_key
+      - name: patient_id
+        description: Business key for the patient, retained for traceability.
+        tests:
+          - not_null
+      - name: doctor_id
+        description: Business key for the doctor, retained for traceability.
+        tests:
+          - not_null
+      - name: treatment_count
+        description: >
+          Number of treatments associated with this appointment.
+          Defaults to 0 when no treatments exist, carried from the intermediate model.
+        tests:
+          - not_null
+      - name: total_treatment_cost
+        description: >
+          Sum of all treatment costs for this appointment.
+          NULL when no treatments exist.
+      - name: earliest_treatment_date
+        description: >
+          Earliest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+      - name: latest_treatment_date
+        description: >
+          Latest treatment date among treatments for this appointment.
+          NULL when no treatments exist.
+      - name: appointment_count
+        description: >
+          Constant measure (always 1) for counting appointments in aggregations.
+        tests:
+          - not_null
+
+  - name: ss_fct_billing
+    description: >
+      Billing fact table containing one row per billing record, identified by bill_id.
+      Sources from ss_int_billing_details and joins to patient, doctor, treatment,
+      and date dimensions for surrogate and date keys. Includes treatment cost
+      carried forward from the intermediate model. Materialized as a table.
+    columns:
+      - name: bill_id
+        description: >
+          Natural business key identifying each billing record. Grain key for this fact.
+        tests:
+          - unique
+          - not_null
+      - name: bill_date
+        description: Date the bill was issued.
+      - name: amount
+        description: Billed amount.
+      - name: payment_method
+        description: Method of payment used (e.g. insurance, credit card, cash).
+      - name: payment_status
+        description: Current payment status of the bill (e.g. paid, pending, overdue).
+      - name: patient_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_patients.
+          Resolved by joining the intermediate patient_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_patients')
+                field: patient_sk
+      - name: doctor_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_doctors.
+          Resolved by joining the intermediate doctor_id to the dimension.
+          May be NULL when the billing record's treatment lacks an appointment
+          or the appointment lacks a doctor reference.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('ss_dim_doctors')
+                field: doctor_sk
+      - name: treatment_sk
+        description: >
+          Surrogate foreign key referencing ss_dim_treatments.
+          Resolved by joining the intermediate treatment_id to the dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_treatments')
+                field: treatment_sk
+      - name: bill_date_key
+        description: >
+          Integer date key (YYYYMMDD) referencing ss_dim_date for the bill date.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ss_dim_date')
+                field: date_key
+      - name: treatment_date_key
+        description: >
+          Integer date key (YYYYMMDD) referencing ss_dim_date for the treatment date.
+          May be NULL when the billing record's treatment reference does not resolve.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('ss_dim_date')
+                field: date_key
+      - name: patient_id
+        description: Business key for the patient, retained for traceability.
+        tests:
+          - not_null
+      - name: doctor_id
+        description: >
+          Business key for the doctor, retained for traceability.
+          May be NULL when the join chain (billing to treatment to appointment to doctor)
+          does not fully resolve.
+      - name: treatment_id
+        description: Business key for the treatment, retained for traceability.
+        tests:
+          - not_null
+      - name: treatment_cost
+        description: >
+          Cost of the individual treatment associated with this billing record,
+          carried from the intermediate model.
+      - name: bill_count
+        description: >
+          Constant measure (always 1) for counting billing records in aggregations.
+        tests:
+          - not_null
